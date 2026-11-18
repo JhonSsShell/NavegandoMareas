@@ -1,0 +1,111 @@
+@startuml 02b_clases_eventos
+!include _estilo.iuml
+!include _colores.iuml
+title Diagrama de clases (2/2) · modelo de ciudad, eventos, comandos e indicaciones
+hide empty members
+skinparam nodesep 25
+skinparam ranksep 35
+
+class NavigationService <<Facade>> FACADE {
+  + apply_command(kind, u, v, factor): dict
+  + route(...): dict
+  - _after_change(action): dict
+}
+
+package "Observer" #F7FEF9 {
+  class Subject OBSERVER {
+    - observers: List[MapObserver]
+    + attach(o) / detach(o)
+    + notify(event)
+  }
+  interface MapObserver <<Observer>> OBSERVER {
+    + on_map_event(event: MapEvent)
+  }
+  class MapEvent OBSERVER {
+    + kind: closed | opened | traffic
+    + edge_key: (u, v)
+    + version: int
+    + improvement: bool
+  }
+  class EventLog OBSERVER
+  class ActiveRouteWatcher OBSERVER {
+    + needs_reroute: bool
+    + follow(request, path)
+  }
+  class RouteCache PROXY
+}
+
+package "Dominio" #FAFAFA {
+  class CityMap <<Subject>> DOMAIN {
+    + nodes: Dict[str, Node]
+    + edges: Dict[key, Edge]
+    + version: int
+    + neighbors(id): Iterator
+    + set_closed(u, v, closed)
+    + set_traffic(u, v, factor)
+  }
+  class Node DOMAIN {
+    + id · x · y · label
+  }
+  class Edge DOMAIN {
+    + name · length · speed_kmh
+    + traffic · closed · kind
+    + travel_time_s(): float
+  }
+}
+
+package "Command" #F8F9FF {
+  class CommandHistory <<Invoker>> COMMAND {
+    - done: List[MapCommand]
+    - undone: List[MapCommand]
+    + execute(cmd)
+    + undo() / redo()
+  }
+  abstract class MapCommand <<Command>> COMMAND {
+    + {abstract} execute()
+    + {abstract} undo()
+    + description: str
+  }
+  class CloseStreetCommand COMMAND
+  class ReopenStreetCommand COMMAND
+  class SetTrafficCommand COMMAND {
+    - factor / _previous
+  }
+}
+
+package "Iterator" #FFFEF0 {
+  class Route <<Aggregate>> ITERATOR {
+    + path: List[str]
+    + __iter__(): TurnByTurnIterator
+  }
+  class TurnByTurnIterator <<Iterator>> ITERATOR {
+    + __next__(): RouteStep
+    - _maneuver(heading): str
+  }
+  class RouteStep ITERATOR {
+    + maneuver · street
+    + distance_m · instruction
+  }
+}
+
+NavigationService --> CommandHistory
+NavigationService --> ActiveRouteWatcher
+NavigationService --> CityMap
+NavigationService ..> Route
+Subject <|-- CityMap
+Subject o--> "*" MapObserver : notifica
+Subject ..> MapEvent : publica
+MapObserver <|.. EventLog
+MapObserver <|.. ActiveRouteWatcher
+MapObserver <|.. RouteCache
+CityMap *-- "*" Node
+CityMap *-- "*" Edge
+CommandHistory o--> "*" MapCommand
+MapCommand <|-- CloseStreetCommand
+MapCommand <|-- ReopenStreetCommand
+MapCommand <|-- SetTrafficCommand
+MapCommand --> CityMap : receptor
+Route ..> TurnByTurnIterator : crea
+TurnByTurnIterator ..> RouteStep : produce
+TurnByTurnIterator --> CityMap
+@enduml

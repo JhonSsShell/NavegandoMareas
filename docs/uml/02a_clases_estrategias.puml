@@ -1,0 +1,109 @@
+@startuml 02a_clases_estrategias
+!include _estilo.iuml
+!include _colores.iuml
+title Diagrama de clases (1/2) · estrategias de navegación, caché y fachada
+hide empty members
+skinparam nodesep 25
+skinparam ranksep 35
+
+class NavigationService <<Facade>> FACADE {
+  - city: CityMap
+  - cache: RouteCache
+  - history: CommandHistory
+  - watcher: ActiveRouteWatcher
+  + route(origin, destination, algorithm, criterion): dict
+  + compare(origin, destination, criterion): dict
+  + apply_command(kind, u, v, factor): dict
+  + undo() / redo() / reset(): dict
+  + metrics(): dict
+}
+
+class StrategyRegistry <<Factory>> STRATEGY {
+  + {static} register(cls)
+  + {static} create(name): RouteStrategy
+  + {static} names(): List[str]
+}
+
+abstract class RouteStrategy <<Strategy>> STRATEGY {
+  + name: str
+  + optimal: bool
+  + find_route(city, o, d, criterion): SearchResult
+  # {abstract} _search(city, o, d, criterion)
+  - _reconstruct(prev, d): List[str]
+  - _fill_costs(city, result, criterion)
+}
+note right of RouteStrategy
+  <b>Template Method</b>
+  find_route(): valida → mide tiempo →
+  _search() → reconstruye ruta → costos
+end note
+
+class BreadthFirstStrategy STRATEGY {
+  cola FIFO · mínimo de saltos
+}
+class DijkstraStrategy STRATEGY {
+  heap por g(n) · óptimo
+}
+class AStarStrategy STRATEGY {
+  heap por g(n)+h(n) · óptimo
+}
+class GreedyBestFirstStrategy STRATEGY {
+  heap por h(n) · rápido, no óptimo
+}
+
+abstract class CostCriterion <<Strategy>> STRATEGY {
+  + {abstract} edge_cost(edge): float
+  + {abstract} heuristic(city, a, b): float
+}
+class DistanceCriterion STRATEGY {
+  h = distancia euclidiana
+}
+class TimeCriterion STRATEGY {
+  h = euclidiana / v_max
+}
+
+class SearchResult DOMAIN {
+  + path: List[str]
+  + cost: float
+  + expanded: int
+  + relaxed: int
+  + elapsed_ms: float
+}
+
+class CachingRouteProxy <<Proxy>> PROXY {
+  - real: RouteStrategy
+  + last_hit: bool
+  + find_route(city, o, d, criterion): SearchResult
+}
+class RouteCache <<Observer>> PROXY {
+  - data: OrderedDict (LRU)
+  + hits / misses / invalidations
+  + get(key) / put(key, result)
+  + on_map_event(event)
+}
+interface MapObserver <<Observer>> OBSERVER {
+  + on_map_event(event)
+}
+class CityMap <<Subject>> DOMAIN {
+  + neighbors(id): Iterator
+  + euclidean(a, b): float
+}
+
+NavigationService ..> StrategyRegistry : pide estrategia
+NavigationService --> RouteCache
+NavigationService ..> CachingRouteProxy : envuelve
+StrategyRegistry ..> RouteStrategy : crea
+RouteStrategy <|-- BreadthFirstStrategy
+RouteStrategy <|-- DijkstraStrategy
+RouteStrategy <|-- AStarStrategy
+RouteStrategy <|-- GreedyBestFirstStrategy
+RouteStrategy <|-- CachingRouteProxy
+CachingRouteProxy o--> "1" RouteStrategy : real
+CachingRouteProxy --> RouteCache
+MapObserver <|.. RouteCache
+RouteStrategy ..> CostCriterion : usa
+RouteStrategy ..> SearchResult : produce
+RouteStrategy ..> CityMap : recorre
+CostCriterion <|-- DistanceCriterion
+CostCriterion <|-- TimeCriterion
+@enduml

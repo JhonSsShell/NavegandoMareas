@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Navegando Mareas · Optimización de rutas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><path d="M16 3l8 14H16z" fill="#fff"/><path d="M15 6L9 17h6z" fill="#cbd5e1"/><path d="M6 19h20l-3 4H9z" fill="#5eead4"/><path d="M2 27c3 0 3-2 6-2s3 2 6 2 3-2 6-2 3 2 6 2 3-2 4-2" stroke="#5eead4" stroke-width="2" fill="none"/></svg>
+    <div>
+      <h1>Navegando Mareas</h1>
+      <p>Prototipo de optimización de rutas · Puerto Marea</p>
+    </div>
+  </div>
+  <div class="status" id="status">Cargando mapa…</div>
+</header>
+
+<main class="layout">
+  <!-- ============ Panel de control ============ -->
+  <aside class="panel controls">
+    <section>
+      <h2><span class="num">1</span> Origen y destino</h2>
+      <label>Origen <select id="origin"></select></label>
+      <label>Destino <select id="destination"></select></label>
+      <p class="hint">También puedes hacer clic en dos intersecciones del mapa.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">2</span> Estrategia de navegación</h2>
+      <div id="algorithms" class="algo-list"></div>
+    </section>
+
+    <section>
+      <h2><span class="num">3</span> Criterio de optimización</h2>
+      <div class="segmented" id="criteria">
+        <button data-criterion="time" class="active">Menor tiempo</button>
+        <button data-criterion="distance">Menor distancia</button>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="animate" checked> Animar exploración</label>
+        <label class="check"><input type="checkbox" id="useCache" checked> Usar caché (Proxy)</label>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary" id="btnRoute">Calcular ruta</button>
+      <button class="btn" id="btnCompare">Comparar los 4 algoritmos</button>
+    </div>
+
+    <section>
+      <h2><span class="num">4</span> Eventos del mapa (Command)</h2>
+      <div class="segmented small" id="modes">
+        <button data-mode="route" class="active">Seleccionar</button>
+        <button data-mode="close">Cerrar / abrir calle</button>
+        <button data-mode="traffic">Tráfico</button>
+      </div>
+      <label id="trafficWrap" class="hidden">Nivel de tráfico
+        <select id="trafficFactor">
+          <option value="1">Libre (x1)</option>
+          <option value="1.5">Moderado (x1.5)</option>
+          <option value="2.5" selected>Alto (x2.5)</option>
+          <option value="4">Trancón (x4)</option>
+        </select>
+      </label>
+      <div class="row">
+        <button class="btn ghost" id="btnUndo" title="Deshacer">↶ Deshacer</button>
+        <button class="btn ghost" id="btnRedo" title="Rehacer">↷ Rehacer</button>
+        <button class="btn ghost" id="btnReset" title="Restablecer">⟲ Reiniciar</button>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ Mapa ============ -->
+  <section class="panel map-panel">
+    <div class="map-head">
+      <div><strong id="mapName">Puerto Marea</strong> <span class="muted" id="mapInfo"></span></div>
+      <div class="mode-pill" id="modePill">Modo: seleccionar origen/destino</div>
+    </div>
+    <svg id="map" role="img" aria-label="Mapa de la ciudad"></svg>
+    <div class="legend">
+      <span><i class="lg avenue"></i>Avenida</span>
+      <span><i class="lg street"></i>Calle</span>
+      <span><i class="lg bridge"></i>Puente</span>
+      <span><i class="lg traffic"></i>Tráfico</span>
+      <span><i class="lg jam"></i>Congestión</span>
+      <span><i class="lg closed"></i>Cerrada</span>
+      <span><i class="dot explored"></i>Explorado</span>
+      <span><i class="lg route"></i>Ruta</span>
+    </div>
+  </section>
+
+  <!-- ============ Resultados ============ -->
+  <aside class="panel results">
+    <nav class="tabs">
+      <button data-tab="result" class="active">Resultado</button>
+      <button data-tab="compare">Comparación</button>
+      <button data-tab="events">Eventos</button>
+      <button data-tab="bench">Rendimiento</button>
+    </nav>
+
+    <div class="tab" id="tab-result">
+      <div id="resultEmpty" class="empty">Elige origen, destino y estrategia, y pulsa <b>Calcular ruta</b>.</div>
+      <div id="resultBody" class="hidden">
+        <div class="result-title" id="resultTitle"></div>
+        <div class="cards" id="metricCards"></div>
+        <h3>Indicaciones paso a paso <span class="tag">Iterator</span></h3>
+        <ol class="steps" id="steps"></ol>
+      </div>
+    </div>
+
+    <div class="tab hidden" id="tab-compare">
+      <div id="compareEmpty" class="empty">Pulsa <b>Comparar los 4 algoritmos</b> para ver la tabla.</div>
+      <div id="compareBody" class="hidden">
+        <div class="result-title" id="compareTitle"></div>
+        <table class="table" id="compareTable"></table>
+        <h3>Nodos explorados</h3>
+        <div id="compareBars" class="bars"></div>
+        <p class="hint">Haz clic en una fila para dibujar esa ruta en el mapa.</p>
+      </div>
+    </div>
+
+    <div class="tab hidden" id="tab-events">
+      <h3>Caché de rutas <span class="tag">Proxy + Observer</span></h3>
+      <div class="cards small" id="cacheCards"></div>
+      <h3>Historial de comandos <span class="tag">Command</span></h3>
+      <ul class="history" id="history"></ul>
+      <h3>Eventos publicados <span class="tag">Observer</span></h3>
+      <ul class="events" id="events"><li class="muted">Sin eventos todavía.</li></ul>
+    </div>
+
+    <div class="tab hidden" id="tab-bench">
+      <p class="hint">Ejecuta los 4 algoritmos sobre una cuadrícula aleatoria (criterio tiempo) y compara su escalabilidad.</p>
+      <div class="row">
+        <label>Tamaño
+          <select id="benchSize">
+            <option value="20">20 × 20</option>
+            <option value="40" selected>40 × 40</option>
+            <option value="60">60 × 60</option>
+            <option value="80">80 × 80</option>
+          </select>
+        </label>
+        <label>Pares
+          <select id="benchPairs">
+            <option>10</option><option selected>20</option><option>40</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn primary" id="btnBench">Ejecutar prueba</button>
+      <div id="benchBody" class="hidden">
+        <div class="result-title" id="benchTitle"></div>
+        <table class="table" id="benchTable"></table>
+        <h3>Nodos explorados promedio</h3>
+        <div id="benchBars" class="bars"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="toast hidden" id="toast"></div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

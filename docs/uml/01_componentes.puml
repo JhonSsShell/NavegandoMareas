@@ -1,0 +1,54 @@
+@startuml 01_componentes
+!include _estilo.iuml
+title Diagrama de componentes · arquitectura por capas de Navegando Mareas
+skinparam componentStyle uml2
+skinparam nodesep 40
+skinparam ranksep 45
+
+package "Presentación · cliente" #F0F9FF {
+  component "UI web\n(index.html + app.js)\n<<SVG interactivo>>" as UI
+}
+package "Presentación · servidor" #EEF2FF {
+  interface "REST/JSON /api/*" as REST
+  component "API REST Flask\n(app.py)" as API
+  component "Gunicorn\n<<WSGI 1×4 hilos>>" as WSGI
+}
+package "Aplicación" #ECFDF5 {
+  interface "INavigation" as INAV
+  component "NavigationService\n<<Facade>>" as FAC
+  component "ActiveRouteWatcher\n<<Observer>>" as WATCH
+}
+package "Dominio" #FFF7ED {
+  interface "RouteStrategy" as IRS
+  component "Motor de rutas\nBFS · Dijkstra · A* · Greedy\n<<Strategy + Template Method>>" as ENG
+  component "Criterios de costo\ndistancia · tiempo\n<<Strategy>>" as COST
+  component "Comandos\n<<Command>>" as CMD
+  component "Indicaciones\n<<Iterator>>" as ITER
+  component "Modelo de ciudad\nCityMap · Node · Edge\n<<Subject>>" as MAP
+  interface "MapObserver" as IOBS
+}
+package "Infraestructura" #FDF2F8 {
+  component "Caché de rutas\nRouteCache + CachingRouteProxy\n<<Proxy + Observer>>" as CACHE
+  component "Proveedor de mapas\n(city.py)" as CITY
+}
+
+UI -down-> REST : fetch()
+REST -down- API
+WSGI -right-> API : sirve
+API -down-> INAV
+INAV -down- FAC
+FAC -down-> IRS : find_route()
+IRS -down- ENG
+FAC -right-> CACHE
+CACHE ..> IRS : delega si MISS
+ENG -down-> COST
+ENG -down-> MAP : neighbors()
+FAC -down-> CMD : execute/undo/redo
+CMD -down-> MAP
+FAC -down-> ITER
+ITER -down-> MAP
+MAP -right- IOBS
+CACHE ..> IOBS : <<implementa>>
+WATCH ..> IOBS : <<implementa>>
+FAC -right-> CITY : construye mapa
+@enduml

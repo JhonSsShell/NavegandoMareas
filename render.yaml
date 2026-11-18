@@ -1,0 +1,10 @@
+# Blueprint de Render (opcional): New > Blueprint > selecciona este repositorio.
+# La versión de Python se toma de .python-version (3.12).
+services:
+  - type: web
+    name: navegando-mareas
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /health

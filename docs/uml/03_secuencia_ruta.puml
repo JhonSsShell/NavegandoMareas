@@ -1,0 +1,65 @@
+@startuml 03_secuencia_ruta
+!include _estilo.iuml
+title Diagrama de secuencia · cálculo de una ruta (Facade → Proxy → Strategy → Iterator)
+hide footbox
+autonumber "<b>0."
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+
+actor "Usuario" as U
+box "Cliente" #F0F9FF
+participant "UI web\n(app.js)" as UI
+end box
+box "Servidor" #F8FAFC
+participant "API Flask" as API
+participant "NavigationService" as F <<Facade>>
+participant "StrategyRegistry" as REG <<Factory>>
+participant "CachingRouteProxy" as PX <<Proxy>>
+participant "RouteCache" as C
+participant "AStarStrategy" as S <<Strategy>>
+participant "CityMap" as M
+participant "Route" as IT <<Iterator>>
+end box
+
+U -> UI : elige origen, destino,\nA* y "menor tiempo"
+UI -> API : POST /api/route {origin, destination, algorithm, criterion}
+API -> F : route(o, d, "astar", "time")
+F -> REG : create("astar")
+REG --> F : AStarStrategy
+F -> PX ** : new(real, cache)
+F -> PX : find_route(city, o, d, TimeCriterion)
+PX -> C : get(("astar","time",o,d))
+alt Acierto de caché (HIT)
+  C --> PX : SearchResult
+  PX --> F : copia del resultado (≈0.01 ms)
+else Fallo de caché (MISS)
+  C --> PX : None
+  PX -> S : find_route(city, o, d, criterio)
+  activate S
+  note right of S
+    <b>Template Method</b>
+    find_route() fija los pasos;
+    _search() es propio de A*
+  end note
+  loop mientras la frontera no esté vacía
+    S -> S : extraer nodo con menor f = g + h
+    S -> M : neighbors(nodo)
+    M --> S : (vecino, calle) abiertas
+    S -> S : relajar aristas y empujar al heap
+  end
+  S -> S : _reconstruct() y _fill_costs()
+  S --> PX : SearchResult(path, cost, expanded, ms)
+  deactivate S
+  PX -> C : put(clave, resultado)
+  PX --> F : SearchResult
+end
+F -> IT ** : Route(city, path)
+loop for step in Route
+  IT --> F : RouteStep("Gire a la derecha en …")
+end
+F -> F : watcher.follow(ruta activa)
+F --> API : dict (ruta, métricas, indicaciones, cache_hit)
+API --> UI : 200 OK · JSON
+UI -> UI : anima nodos explorados\ny dibuja la ruta
+UI --> U : ruta óptima + métricas
+@enduml

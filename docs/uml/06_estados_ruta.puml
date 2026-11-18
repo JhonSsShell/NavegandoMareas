@@ -1,0 +1,19 @@
+@startuml 06_estados_ruta
+!include _estilo.iuml
+title Diagrama de estados · ciclo de vida de una ruta activa
+hide empty description
+[*] --> SinSeleccion
+SinSeleccion --> OrigenElegido : clic en intersección
+OrigenElegido --> ListaParaCalcular : clic en destino
+ListaParaCalcular --> Calculando : "Calcular ruta"
+Calculando --> RutaActiva : ruta encontrada
+Calculando --> SinRuta : destino inalcanzable
+RutaActiva --> Recalculando : MapEvent afecta la ruta\no la puede mejorar
+Recalculando --> RutaActiva : nueva ruta óptima
+Recalculando --> SinRuta : todas las vías cerradas
+SinRuta --> Recalculando : calle reabierta (undo)
+RutaActiva --> ListaParaCalcular : cambia origen/destino\no estrategia
+RutaActiva --> [*] : reiniciar mapa
+state RutaActiva : entry / watcher.follow(ruta)\ndo / mostrar indicaciones
+state Recalculando : entry / caché invalidada\ndo / find_route()
+@enduml

@@ -1,0 +1,49 @@
+@startuml 04_secuencia_reruteo
+!include _estilo.iuml
+title Diagrama de secuencia · cierre de calle y re-ruteo automático (Command + Observer)
+hide footbox
+autonumber "<b>0."
+skinparam ParticipantPadding 8
+
+actor "Operador" as O
+participant "UI web" as UI
+participant "API Flask" as API
+participant "NavigationService" as F <<Facade>>
+participant "CommandHistory" as H <<Invoker>>
+participant "CloseStreetCommand" as CMD <<Command>>
+participant "CityMap" as M <<Subject>>
+participant "RouteCache" as C <<Observer>>
+participant "EventLog" as L <<Observer>>
+participant "ActiveRouteWatcher" as W <<Observer>>
+
+O -> UI : clic en "Puente Norte"\n(modo cerrar calle)
+UI -> API : POST /api/commands {type:"close", u:"E1", v:"F1"}
+API -> F : apply_command("close", "E1", "F1")
+F -> CMD ** : new(city, "E1", "F1")
+F -> H : execute(cmd)
+H -> CMD : execute()
+CMD -> M : set_closed("E1","F1", True)
+M -> M : version += 1
+M -> C : on_map_event(evento)
+C -> C : clear() · invalida rutas obsoletas
+M -> L : on_map_event(evento)
+M -> W : on_map_event(evento)
+W -> W : ¿la calle está en la ruta activa?\nsí → needs_reroute = True
+H -> H : apila en "done", limpia "undone"
+F -> F : _after_change()
+opt watcher.needs_reroute
+  F -> F : route(o, d, "astar", "time")
+  note right of F : misma secuencia del cálculo de ruta\n(MISS: la caché fue invalidada)
+end
+F --> API : {map, events, rerouted}
+API --> UI : 200 OK · JSON
+UI --> O : calle tachada + nueva ruta\n+ aviso "Ruta recalculada"
+O -> UI : Deshacer
+UI -> API : POST /api/commands/undo
+API -> F : undo()
+F -> H : undo()
+H -> CMD : undo()
+CMD -> M : set_closed("E1","F1", False)
+M -> W : on_map_event(opened, improvement=True)
+note over W : una reapertura puede habilitar\nuna ruta mejor → recalcula
+@enduml

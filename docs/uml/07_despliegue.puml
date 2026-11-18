@@ -1,0 +1,31 @@
+@startuml 07_despliegue
+!include _estilo.iuml
+title Diagrama de despliegue · prototipo en la nube (Railway o Render)
+
+node "Equipo del usuario" <<device>> {
+  node "Navegador web" <<execution environment>> {
+    artifact "index.html + app.js\n+ styles.css" as FE
+  }
+}
+cloud "GitHub" as GH {
+  artifact "Repositorio\nnavegando-mareas" as REPO
+}
+node "Plataforma PaaS\n(Railway / Render)" <<cloud>> as PAAS {
+  node "Contenedor Linux\nPython 3.12" <<container>> as CT {
+    node "Gunicorn\n1 proceso × 4 hilos" <<WSGI server>> as GUN {
+      component "Flask app\n(app.py)" as APP
+      component "navigation/*\n(dominio + caché\nen memoria)" as NAV
+    }
+  }
+  component "Balanceador / TLS\n(dominio *.up.railway.app\no *.onrender.com)" as LB
+}
+FE --> LB : HTTPS · JSON
+LB --> GUN : HTTP · $PORT
+APP --> NAV
+REPO ..> PAAS : git push → build\n(pip install -r requirements.txt)\n→ deploy automático
+note bottom of CT
+  Health check: GET /health
+  Estado en memoria: escalar horizontalmente
+  exigiría Redis u otro almacén compartido
+end note
+@enduml

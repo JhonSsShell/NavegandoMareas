@@ -1,0 +1,6 @@
+scenario,found,cost_s,distance_m,expanded,path,via
+"Ruta inicial (A*, menor tiempo)",True,255.75,3595.0,50,A0-B0-C0-D0-E0-E1-F1-F2-F3-F4-F5-F6-G6-H6-I6-J6,Avenida Norte → Carrera 5 → Puente Norte → Avenida del Río → Avenida Costanera
+Cierre de Puente Norte (E1–F1),True,271.59,3595.0,41,A0-B0-C0-D0-E0-E1-E2-E3-E4-E5-F5-F6-G6-H6-I6-J6,Avenida Norte → Carrera 5 → Puente Sur → Avenida del Río → Avenida Costanera
+Trancón x4 en Carrera 5 (E4–E5),True,299.19,4035.0,46,A0-A1-A2-A3-A4-A5-A6-B6-C6-D6-E6-E5-F5-F6-G6-H6-I6-J6,Carrera 1 → Avenida Costanera → Carrera 5 → Puente Sur → Avenida del Río → Avenida Costanera
+Deshacer último comando,True,271.59,3595.0,41,A0-B0-C0-D0-E0-E1-E2-E3-E4-E5-F5-F6-G6-H6-I6-J6,Avenida Norte → Carrera 5 → Puente Sur → Avenida del Río → Avenida Costanera
+Re-ruteos automáticos,,,,3,,

@@ -1,0 +1,58 @@
+@startuml 05_actividad_navegacion
+!include _estilo.iuml
+title Diagrama de actividad · flujo de navegación con re-ruteo
+
+|Usuario|
+start
+:Seleccionar origen y destino\n(lista o clic en el mapa);
+:Elegir estrategia\n(BFS · Dijkstra · A* · Greedy)\ny criterio (tiempo · distancia);
+:Pulsar "Calcular ruta";
+|Sistema|
+if (¿origen ≠ destino y nodos válidos?) then (no)
+  :Responder 400\ncon mensaje de error;
+  |Usuario|
+  :Corregir selección;
+  stop
+else (sí)
+endif
+|Sistema|
+if (¿ruta en caché (Proxy)?) then (HIT)
+  :Devolver copia del\nresultado almacenado;
+else (MISS)
+  :Crear estrategia con\nStrategyRegistry;
+  :Ejecutar búsqueda\n(Template Method: _search);
+  :Guardar resultado en caché LRU;
+endif
+if (¿existe ruta?) then (no)
+  :Informar "sin ruta disponible";
+else (sí)
+  :Generar indicaciones\npaso a paso (Iterator);
+  :Registrar ruta activa\n(ActiveRouteWatcher);
+endif
+|Usuario|
+:Ver animación de exploración,\nruta, métricas e indicaciones;
+repeat
+  |Usuario|
+  :Cerrar/reabrir calle o\nfijar tráfico (Command);
+  |Sistema|
+  :Aplicar comando y\npublicar MapEvent (Observer);
+  fork
+    :RouteCache\ninvalida entradas;
+  fork again
+    :EventLog\nregistra el evento;
+  fork again
+    :ActiveRouteWatcher\nevalúa el impacto;
+  end fork
+  if (¿afecta la ruta activa\no la puede mejorar?) then (sí)
+    :Recalcular ruta\n(re-ruteo automático);
+    |Usuario|
+    :Recibir aviso\n"Ruta recalculada";
+  else (no)
+    |Sistema|
+    :Mantener la ruta actual;
+  endif
+  |Usuario|
+repeat while (¿más eventos o deshacer/rehacer?) is (sí)
+-> no;
+stop
+@enduml
